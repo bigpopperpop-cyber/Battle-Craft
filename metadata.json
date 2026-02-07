@@ -1,0 +1,5 @@
+{
+  "name": "Warcraft: Mobile Origins",
+  "description": "A mobile-optimized real-time strategy game inspired by the classic Orcs vs Humans, featuring resource management, base building, and AI-powered campaign briefings using Gemini.",
+  "requestFramePermissions": []
+}
