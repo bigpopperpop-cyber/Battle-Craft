@@ -26,9 +26,13 @@ const App: React.FC = () => {
   // Initialize Auth and check for saves
   useEffect(() => {
     initAuth().then(async (userUid) => {
-      setUid(userUid);
-      const data = await loadGameState(userUid);
-      if (data) setSaveData(data);
+      if (userUid) {
+        setUid(userUid);
+        const data = await loadGameState(userUid);
+        if (data) setSaveData(data);
+      }
+    }).catch(err => {
+      console.warn("Auth initialization failed, running in local mode:", err);
     });
   }, []);
 
@@ -38,7 +42,7 @@ const App: React.FC = () => {
 
     const interval = setInterval(async () => {
       setIsSyncing(true);
-      await saveGameState({
+      const success = await saveGameState({
         uid,
         gold: engine.playerResources.gold,
         wood: engine.playerResources.wood,
@@ -101,7 +105,7 @@ const App: React.FC = () => {
         </div>
 
         <div className="z-10 text-center">
-            <h1 className="text-5xl md:text-7xl font-bold mb-4 font-serif tracking-tighter text-amber-500 drop-shadow-lg">
+            <h1 className="text-5xl md:text-7xl font-bold mb-4 font-serif tracking-tighter text-amber-500 drop-shadow-lg text-shadow-xl">
                 ORCS VS HUMANS
             </h1>
             <p className="text-gray-400 mb-8 text-lg uppercase tracking-widest">Mobile Origins</p>
@@ -112,7 +116,7 @@ const App: React.FC = () => {
                     onClick={() => handleStartGame(saveData.faction as Faction, true)}
                     className="group relative px-12 py-4 bg-amber-600/20 hover:bg-amber-600 transition-all border-2 border-amber-500 rounded-lg overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.2)]"
                   >
-                    <span className="relative z-10 text-xl font-bold text-amber-500 group-hover:text-white">CONTINUE PROGRESS</span>
+                    <span className="relative z-10 text-xl font-bold text-amber-500 group-hover:text-white uppercase">Resume Mission</span>
                   </button>
                 )}
 
@@ -136,7 +140,7 @@ const App: React.FC = () => {
 
                 <button 
                   onClick={handleOpenLeaderboard}
-                  className="mt-4 text-amber-700 hover:text-amber-500 font-bold tracking-widest flex items-center justify-center gap-2"
+                  className="mt-4 text-amber-700 hover:text-amber-500 font-bold tracking-widest flex items-center justify-center gap-2 transition-colors"
                 >
                   🏆 HALL OF HEROES
                 </button>
@@ -151,7 +155,7 @@ const App: React.FC = () => {
         </div>
 
         <footer className="absolute bottom-8 text-gray-500 text-[10px] text-center px-4 uppercase tracking-tighter">
-            Cloud Sync Active &bull; Gemini AI Strategist &bull; Mobile Enhanced
+            {uid ? 'Cloud Sync Active' : 'Offline Mode'} &bull; Gemini AI Strategist &bull; Mobile Enhanced
         </footer>
       </div>
     );
@@ -168,7 +172,7 @@ const App: React.FC = () => {
       )}
 
       {/* Sync Status Icon */}
-      {isSyncing && (
+      {isSyncing && uid && (
         <div className="fixed top-4 left-4 z-50 flex items-center gap-2 bg-black/50 px-3 py-1 rounded-full border border-amber-500/30">
           <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse-glow"></div>
           <span className="text-[10px] text-amber-500 font-bold uppercase">Syncing...</span>
