@@ -1,11 +1,13 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import GameMap from './components/GameMap';
 import HUD from './components/HUD';
 import BriefingModal from './components/BriefingModal';
+import Leaderboard from './components/Leaderboard';
 import { GameEngine } from './gameEngine';
 import { Faction, GameEntity } from './types';
 import { generateBriefing } from './services/geminiService';
+import { initAuth, saveGameState, loadGameState, getLeaderboard, PlayerData } from './services/firebaseService';
 
 const App: React.FC = () => {
   const [gameState, setGameState] = useState<'menu' | 'briefing' | 'playing'>('menu');
@@ -13,25 +15,71 @@ const App: React.FC = () => {
   const [briefing, setBriefing] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [uid, setUid] = useState<string | null>(null);
+  const [saveData, setSaveData] = useState<PlayerData | null>(null);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [leaderboardEntries, setLeaderboardEntries] = useState<PlayerData[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const engine = useMemo(() => new GameEngine(), []);
+
+  // Initialize Auth and check for saves
+  useEffect(() => {
+    initAuth().then(async (userUid) => {
+      setUid(userUid);
+      const data = await loadGameState(userUid);
+      if (data) setSaveData(data);
+    });
+  }, []);
+
+  // Auto-save loop
+  useEffect(() => {
+    if (gameState !== 'playing' || !uid) return;
+
+    const interval = setInterval(async () => {
+      setIsSyncing(true);
+      await saveGameState({
+        uid,
+        gold: engine.playerResources.gold,
+        wood: engine.playerResources.wood,
+        faction: faction,
+        mission: 1, // Currently only 1 mission demo
+        lastUpdated: Date.now()
+      });
+      setTimeout(() => setIsSyncing(false), 1000);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [gameState, uid, faction, engine.playerResources]);
 
   const selectedEntity = useMemo(() => {
     return engine.units.find(u => u.id === selectedId) || engine.buildings.find(b => b.id === selectedId) || null;
   }, [selectedId, engine]);
 
-  const handleStartGame = async (selectedFaction: Faction) => {
+  const handleStartGame = async (selectedFaction: Faction, resume: boolean = false) => {
     setFaction(selectedFaction);
     setLoading(true);
-    const text = await generateBriefing(selectedFaction, 1);
+    
+    if (resume && saveData) {
+      engine.playerResources.gold = saveData.gold;
+      engine.playerResources.wood = saveData.wood;
+    }
+
+    const text = await generateBriefing(selectedFaction, resume ? (saveData?.mission || 1) : 1);
     setBriefing(text);
     setLoading(false);
     setGameState('briefing');
   };
 
+  const handleOpenLeaderboard = async () => {
+    setLoading(true);
+    const entries = await getLeaderboard();
+    setLeaderboardEntries(entries);
+    setShowLeaderboard(true);
+    setLoading(false);
+  };
+
   const handleAction = (action: string) => {
-    console.log("HUD Action:", action, "on", selectedId);
-    // Logic for training units, stopping, etc. would go here
     if (action === 'stop' && selectedId) {
         const u = engine.units.find(u => u.id === selectedId);
         if (u) {
@@ -44,7 +92,10 @@ const App: React.FC = () => {
   if (gameState === 'menu') {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#0d0d0d] text-white p-6 relative overflow-hidden">
-        {/* Background Visual */}
+        {showLeaderboard && (
+          <Leaderboard entries={leaderboardEntries} onClose={() => setShowLeaderboard(false)} />
+        )}
+        
         <div className="absolute inset-0 opacity-20 pointer-events-none">
             <img src="https://picsum.photos/1920/1080?grayscale&blur=5" className="w-full h-full object-cover" alt="Background" />
         </div>
@@ -53,25 +104,41 @@ const App: React.FC = () => {
             <h1 className="text-5xl md:text-7xl font-bold mb-4 font-serif tracking-tighter text-amber-500 drop-shadow-lg">
                 ORCS VS HUMANS
             </h1>
-            <p className="text-gray-400 mb-12 text-lg uppercase tracking-widest">Mobile Origins</p>
+            <p className="text-gray-400 mb-8 text-lg uppercase tracking-widest">Mobile Origins</p>
             
-            <div className="flex flex-col sm:flex-row gap-6">
+            <div className="flex flex-col gap-4 max-w-md mx-auto">
+                {saveData && (
+                  <button 
+                    onClick={() => handleStartGame(saveData.faction as Faction, true)}
+                    className="group relative px-12 py-4 bg-amber-600/20 hover:bg-amber-600 transition-all border-2 border-amber-500 rounded-lg overflow-hidden shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+                  >
+                    <span className="relative z-10 text-xl font-bold text-amber-500 group-hover:text-white">CONTINUE PROGRESS</span>
+                  </button>
+                )}
+
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <button 
+                      onClick={() => handleStartGame(Faction.HUMAN)}
+                      className="group relative px-12 py-4 bg-blue-900/40 hover:bg-blue-800 transition-all border-2 border-blue-500 rounded-lg overflow-hidden"
+                      disabled={loading}
+                  >
+                      <span className="relative z-10 text-xl font-bold">HUMAN ALLIANCE</span>
+                  </button>
+                  
+                  <button 
+                      onClick={() => handleStartGame(Faction.ORC)}
+                      className="group relative px-12 py-4 bg-red-900/40 hover:bg-red-800 transition-all border-2 border-red-500 rounded-lg overflow-hidden"
+                      disabled={loading}
+                  >
+                      <span className="relative z-10 text-xl font-bold">ORCISH HORDE</span>
+                  </button>
+                </div>
+
                 <button 
-                    onClick={() => handleStartGame(Faction.HUMAN)}
-                    className="group relative px-12 py-4 bg-blue-900/40 hover:bg-blue-800 transition-all border-2 border-blue-500 rounded-lg overflow-hidden"
-                    disabled={loading}
+                  onClick={handleOpenLeaderboard}
+                  className="mt-4 text-amber-700 hover:text-amber-500 font-bold tracking-widest flex items-center justify-center gap-2"
                 >
-                    <span className="relative z-10 text-xl font-bold">HUMAN ALLIANCE</span>
-                    <div className="absolute inset-0 bg-blue-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
-                </button>
-                
-                <button 
-                    onClick={() => handleStartGame(Faction.ORC)}
-                    className="group relative px-12 py-4 bg-red-900/40 hover:bg-red-800 transition-all border-2 border-red-500 rounded-lg overflow-hidden"
-                    disabled={loading}
-                >
-                    <span className="relative z-10 text-xl font-bold">ORCISH HORDE</span>
-                    <div className="absolute inset-0 bg-red-500 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                  🏆 HALL OF HEROES
                 </button>
             </div>
             
@@ -83,9 +150,8 @@ const App: React.FC = () => {
             )}
         </div>
 
-        <footer className="absolute bottom-8 text-gray-500 text-xs text-center px-4">
-            Enhanced for mobile with Gemini AI Powered Campaign Briefings. <br/>
-            Drag to pan, tap to select/order.
+        <footer className="absolute bottom-8 text-gray-500 text-[10px] text-center px-4 uppercase tracking-tighter">
+            Cloud Sync Active &bull; Gemini AI Strategist &bull; Mobile Enhanced
         </footer>
       </div>
     );
@@ -99,6 +165,14 @@ const App: React.FC = () => {
           faction={faction} 
           onClose={() => setGameState('playing')} 
         />
+      )}
+
+      {/* Sync Status Icon */}
+      {isSyncing && (
+        <div className="fixed top-4 left-4 z-50 flex items-center gap-2 bg-black/50 px-3 py-1 rounded-full border border-amber-500/30">
+          <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse-glow"></div>
+          <span className="text-[10px] text-amber-500 font-bold uppercase">Syncing...</span>
+        </div>
       )}
 
       <GameMap 
