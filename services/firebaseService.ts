@@ -5,12 +5,13 @@ import { getAuth, signInAnonymously, onAuthStateChanged, Auth } from "firebase/a
 
 // The API key must be obtained exclusively from the environment variable process.env.API_KEY
 const firebaseConfig = {
-  apiKey: process.env.API_KEY,
-  authDomain: "mobile-origins.firebaseapp.com",
-  projectId: "mobile-origins",
-  storageBucket: "mobile-origins.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
+  apiKey: "AIzaSyAKjPjHyzP2X5vo2w7n8O0neHjhR0DcsQQ",
+  authDomain: "orcs-vs-humans-mobile.firebaseapp.com",
+  projectId: "orcs-vs-humans-mobile",
+  storageBucket: "orcs-vs-humans-mobile.firebasestorage.app",
+  messagingSenderId: "303878706418",
+  appId: "1:303878706418:web:6b96377f9f360e117e6c6b",
+  measurementId: "G-ZFKRW5M9V2"
 };
 
 let app: FirebaseApp | null = null;
