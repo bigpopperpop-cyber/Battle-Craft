@@ -17,32 +17,42 @@ import {
 import { getAuth, signInAnonymously, onAuthStateChanged, Auth } from "firebase/auth";
 
 // The API key must be obtained exclusively from the environment variable process.env.API_KEY
+// Note: These project details are for the 'orcs-vs-humans-mobile' project.
+// If the API_KEY provided doesn't match this project, auth will fail.
 const firebaseConfig = {
   apiKey: process.env.API_KEY,
   authDomain: "orcs-vs-humans-mobile.firebaseapp.com",
   projectId: "orcs-vs-humans-mobile",
   storageBucket: "orcs-vs-humans-mobile.firebasestorage.app",
   messagingSenderId: "303878706418",
-  appId: "1:303878706418:web:6b96377f9f360e117e6c6b",
-  measurementId: "G-ZFKRW5M9V2"
+  appId: "1:303878706418:web:6b96377f9f360e117e6c6b"
 };
 
 let app: FirebaseApp | null = null;
 let db: Firestore | null = null;
 let auth: Auth | null = null;
 
-try {
-  // Ensure we have a key and it looks valid before initializing
-  if (firebaseConfig.apiKey && firebaseConfig.apiKey.length > 10) {
+const initializeFirebase = () => {
+  if (app) return;
+  
+  const key = process.env.API_KEY;
+  // Basic validation that key is not empty or a common placeholder
+  if (!key || key === 'undefined' || key.length < 10) {
+    console.warn("Firebase: No valid API Key found in process.env.API_KEY. Cloud features disabled.");
+    return;
+  }
+
+  try {
     app = initializeApp(firebaseConfig);
     db = getFirestore(app);
     auth = getAuth(app);
-  } else {
-    console.warn("Firebase: Valid API Key missing from process.env.API_KEY. Cloud features disabled.");
+  } catch (e) {
+    console.error("Firebase Initialization Error:", e);
   }
-} catch (e) {
-  console.error("Firebase Initialization Error:", e);
-}
+};
+
+// Initialize immediately
+initializeFirebase();
 
 export interface PlayerData {
   uid: string;
@@ -55,19 +65,22 @@ export interface PlayerData {
 
 export const initAuth = (): Promise<string | null> => {
   return new Promise((resolve) => {
-    if (!auth) {
-      console.warn("Auth not initialized. Proceeding in offline mode.");
-      return resolve(null);
-    }
+    if (!auth) return resolve(null);
 
-    onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
       if (user) {
         resolve(user.uid);
       } else {
         signInAnonymously(auth!)
           .then(cred => resolve(cred.user.uid))
           .catch((err) => {
-            console.error("Anonymous Auth failed:", err);
+            // Handle the specific error 'auth/api-key-not-valid'
+            if (err.code === 'auth/api-key-not-valid') {
+               console.warn("Firebase: API Key is invalid for this project. Check your settings.");
+            } else {
+               console.error("Firebase Anonymous Auth failed:", err);
+            }
             resolve(null);
           });
       }
@@ -82,8 +95,7 @@ export const saveGameState = async (data: PlayerData) => {
     await setDoc(userRef, { ...data, lastUpdated: serverTimestamp() }, { merge: true });
     return true;
   } catch (e) {
-    // If the API is disabled or connection fails, this will catch permission-denied errors
-    console.warn("Firebase Save Failed (Verify Firestore is enabled in console):", e);
+    console.warn("Firebase Save Failed:", e);
     return false;
   }
 };
@@ -120,7 +132,6 @@ export const saveGameProgress = async (playerData: PlayerData) => {
       ...playerData,
       timestamp: serverTimestamp(),
     });
-    console.log("Victory saved to the Leaderboard!");
   } catch (e) {
     console.error("Error saving score: ", e);
   }
