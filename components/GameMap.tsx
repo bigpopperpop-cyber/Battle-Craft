@@ -1,8 +1,7 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { GameEngine } from '../gameEngine';
-import { TILE_SIZE, COLORS } from '../constants';
-import { Faction, EntityType } from '../types';
+import { TILE_SIZE, COLORS, MAP_SIZE } from '../constants';
+import { Faction } from '../types';
 
 interface GameMapProps {
   engine: GameEngine;
@@ -11,13 +10,43 @@ interface GameMapProps {
 
 const GameMap: React.FC<GameMapProps> = ({ engine, onSelect }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [touchStart, setTouchStart] = useState< { x: number, y: number } | null>(null);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const gridCacheRef = useRef<HTMLCanvasElement | null>(null);
+  const [offset, setOffset] = useState({ x: 100, y: 100 });
+  const lastPointer = useRef({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+
+  // Cache the grid layer
+  useEffect(() => {
+    const gridCanvas = document.createElement('canvas');
+    gridCanvas.width = MAP_SIZE * TILE_SIZE;
+    gridCanvas.height = MAP_SIZE * TILE_SIZE;
+    const gctx = gridCanvas.getContext('2d');
+    if (gctx) {
+      gctx.fillStyle = COLORS.NEUTRAL.GROUND;
+      gctx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
+      
+      gctx.strokeStyle = COLORS.NEUTRAL.GRID;
+      gctx.lineWidth = 1;
+      for (let x = 0; x <= MAP_SIZE; x++) {
+        gctx.beginPath();
+        gctx.moveTo(x * TILE_SIZE, 0);
+        gctx.lineTo(x * TILE_SIZE, MAP_SIZE * TILE_SIZE);
+        gctx.stroke();
+      }
+      for (let y = 0; y <= MAP_SIZE; y++) {
+        gctx.beginPath();
+        gctx.moveTo(0, y * TILE_SIZE);
+        gctx.lineTo(MAP_SIZE * TILE_SIZE, y * TILE_SIZE);
+        gctx.stroke();
+      }
+    }
+    gridCacheRef.current = gridCanvas;
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
     let animationId: number;
@@ -26,71 +55,73 @@ const GameMap: React.FC<GameMapProps> = ({ engine, onSelect }) => {
     const render = (time: number) => {
       const deltaTime = time - lastTime;
       lastTime = time;
-
       engine.update(deltaTime);
 
-      // Clear
-      ctx.fillStyle = '#1a1a1a';
+      // Background
+      ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.save();
       ctx.translate(offset.x, offset.y);
 
-      // Draw Grid
-      ctx.strokeStyle = '#2d3748';
-      ctx.lineWidth = 1;
-      for (let x = 0; x <= 40; x++) {
-        ctx.beginPath();
-        ctx.moveTo(x * TILE_SIZE, 0);
-        ctx.lineTo(x * TILE_SIZE, 40 * TILE_SIZE);
-        ctx.stroke();
-      }
-      for (let y = 0; y <= 40; y++) {
-        ctx.beginPath();
-        ctx.moveTo(0, y * TILE_SIZE);
-        ctx.lineTo(40 * TILE_SIZE, y * TILE_SIZE);
-        ctx.stroke();
+      // 1. Grid
+      if (gridCacheRef.current) {
+        ctx.drawImage(gridCacheRef.current, 0, 0);
       }
 
-      // Draw Resources
+      // 2. Resources
       engine.resources.forEach(res => {
-        ctx.fillStyle = res.name === 'Forest' ? COLORS.NEUTRAL.WOOD : COLORS.NEUTRAL.GOLD;
-        ctx.beginPath();
+        const tx = res.pos.x * TILE_SIZE;
+        const ty = res.pos.y * TILE_SIZE;
         if (res.name === 'Forest') {
-            ctx.moveTo(res.pos.x * TILE_SIZE + 20, res.pos.y * TILE_SIZE + 5);
-            ctx.lineTo(res.pos.x * TILE_SIZE + 5, res.pos.y * TILE_SIZE + 35);
-            ctx.lineTo(res.pos.x * TILE_SIZE + 35, res.pos.y * TILE_SIZE + 35);
-            ctx.fill();
+          ctx.fillStyle = COLORS.NEUTRAL.WOOD;
+          ctx.beginPath();
+          ctx.moveTo(tx + 20, ty + 2);
+          ctx.lineTo(tx + 5, ty + 38);
+          ctx.lineTo(tx + 35, ty + 38);
+          ctx.fill();
         } else {
-            ctx.fillRect(res.pos.x * TILE_SIZE + 4, res.pos.y * TILE_SIZE + 4, 32, 32);
+          ctx.fillStyle = COLORS.NEUTRAL.GOLD;
+          ctx.fillRect(tx + 4, ty + 4, 32, 32);
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(tx + 8, ty + 8, 24, 24);
         }
       });
 
-      // Draw Units
+      // 3. Units
       engine.units.forEach(unit => {
+        const tx = unit.pos.x * TILE_SIZE;
+        const ty = unit.pos.y * TILE_SIZE;
         const color = unit.faction === Faction.HUMAN ? COLORS.HUMAN.PRIMARY : COLORS.ORC.PRIMARY;
-        ctx.fillStyle = color;
         
-        // Selection Circle
+        // Selection
         if (unit.id === engine.selectedEntityId) {
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.arc(unit.pos.x * TILE_SIZE + 20, unit.pos.y * TILE_SIZE + 20, 22, 0, Math.PI * 2);
-            ctx.stroke();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 2]);
+          ctx.beginPath();
+          ctx.arc(tx + 20, ty + 20, 22, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
         }
 
-        // Body
+        // Unit Body
+        ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(unit.pos.x * TILE_SIZE + 20, unit.pos.y * TILE_SIZE + 20, 12, 0, Math.PI * 2);
+        ctx.arc(tx + 20, ty + 20, 12, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
         // HP Bar
-        const hpPercent = unit.hp / unit.maxHp;
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(unit.pos.x * TILE_SIZE + 5, unit.pos.y * TILE_SIZE - 5, 30, 4);
-        ctx.fillStyle = '#22c55e';
-        ctx.fillRect(unit.pos.x * TILE_SIZE + 5, unit.pos.y * TILE_SIZE - 5, 30 * hpPercent, 4);
+        const hpPct = unit.hp / unit.maxHp;
+        const hpColor = hpPct > 0.6 ? '#22c55e' : hpPct > 0.25 ? '#eab308' : '#ef4444';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(tx + 5, ty - 10, 30, 4);
+        ctx.fillStyle = hpColor;
+        ctx.fillRect(tx + 5, ty - 10, 30 * hpPct, 4);
       });
 
       ctx.restore();
@@ -102,37 +133,39 @@ const GameMap: React.FC<GameMapProps> = ({ engine, onSelect }) => {
   }, [engine, offset]);
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const x = e.clientX - rect.left - offset.x;
-    const y = e.clientY - rect.top - offset.y;
-    
-    setTouchStart({ x: e.clientX, y: e.clientY });
-
-    const worldX = x / TILE_SIZE;
-    const worldY = y / TILE_SIZE;
-
-    if (engine.selectedEntityId) {
-      // If something selected, issue order
-      engine.issueOrder(engine.selectedEntityId, worldX, worldY);
-      // Optional: keep selection or deselect
-    } else {
-      const selected = engine.selectAt(worldX, worldY);
-      onSelect(selected?.id || null);
-    }
+    isDragging.current = false;
+    lastPointer.current = { x: e.clientX, y: e.clientY };
+    canvasRef.current?.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!touchStart) return;
-    // Simple drag to pan
-    const dx = e.clientX - touchStart.x;
-    const dy = e.clientY - touchStart.y;
-    setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-    setTouchStart({ x: e.clientX, y: e.clientY });
+    const dx = Math.abs(e.clientX - lastPointer.current.x);
+    const dy = Math.abs(e.clientY - lastPointer.current.y);
+    if (dx > 4 || dy > 4) {
+      isDragging.current = true;
+      setOffset(prev => ({
+        x: prev.x + (e.clientX - lastPointer.current.x),
+        y: prev.y + (e.clientY - lastPointer.current.y)
+      }));
+      lastPointer.current = { x: e.clientX, y: e.clientY };
+    }
   };
 
-  const handlePointerUp = () => {
-    setTouchStart(null);
+  const handlePointerUp = (e: React.PointerEvent) => {
+    canvasRef.current?.releasePointerCapture(e.pointerId);
+    if (!isDragging.current) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const wx = (e.clientX - rect.left - offset.x) / TILE_SIZE;
+      const wy = (e.clientY - rect.top - offset.y) / TILE_SIZE;
+
+      if (engine.selectedEntityId) {
+        engine.issueOrder(engine.selectedEntityId, wx, wy);
+      } else {
+        const sel = engine.selectAt(wx, wy);
+        onSelect(sel?.id || null);
+      }
+    }
   };
 
   return (
@@ -143,7 +176,7 @@ const GameMap: React.FC<GameMapProps> = ({ engine, onSelect }) => {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      className="cursor-crosshair block"
+      className="block cursor-crosshair"
     />
   );
 };

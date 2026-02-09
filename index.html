@@ -1,24 +1,48 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Warcraft: Mobile Origins</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #1a1a1a; font-family: 'Inter', sans-serif; }
+        body { 
+          margin: 0; 
+          overflow: hidden; 
+          background-color: #000; 
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          -webkit-tap-highlight-color: transparent;
+          user-select: none;
+        }
         canvas { touch-action: none; }
-        /* Simple scrollbar for UI */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: #2d3748; }
-        ::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 2px; }
         @keyframes pulse-glow {
           0% { opacity: 0.4; }
           50% { opacity: 1; }
           100% { opacity: 0.4; }
         }
         .animate-pulse-glow { animation: pulse-glow 2s infinite ease-in-out; }
+        
+        /* Custom font feel */
+        @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap');
+        .font-warcraft { font-family: 'MedievalSharp', cursive; }
+
+        .typewriter-text {
+          overflow: hidden;
+          border-right: .15em solid orange;
+          white-space: normal;
+          animation: 
+            typing 3.5s steps(40, end),
+            blink-caret .75s step-end infinite;
+        }
+
+        @keyframes typing {
+          from { max-height: 0; }
+          to { max-height: 500px; }
+        }
+        @keyframes blink-caret {
+          from, to { border-color: transparent }
+          50% { border-color: #f59e0b; }
+        }
     </style>
 <script type="importmap">
 {

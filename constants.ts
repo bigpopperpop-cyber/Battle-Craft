@@ -1,22 +1,27 @@
-
 export const TILE_SIZE = 40;
-export const MAP_SIZE = 40; // 40x40 tiles
+export const MAP_SIZE = 40;
 
 export const COLORS = {
   HUMAN: {
-    PRIMARY: '#3b82f6', // blue-500
+    PRIMARY: '#2563eb', // Blue
     SECONDARY: '#60a5fa',
     ACCENT: '#fbbf24'
   },
   ORC: {
-    PRIMARY: '#ef4444', // red-500
+    PRIMARY: '#dc2626', // Red
     SECONDARY: '#f87171',
-    ACCENT: '#10b981'
+    ACCENT: '#16a34a'
   },
   NEUTRAL: {
-    GOLD: '#f59e0b',
-    WOOD: '#10b981',
-    GROUND: '#2d3748'
+    GOLD: '#fbbf24',
+    WOOD: '#15803d',
+    GROUND: '#1a2e1a', // Swampy green-dark
+    GRID: '#0f170f'
+  },
+  UI: {
+    STONE: '#2d3748',
+    WOOD: '#451a03',
+    BORDER: '#78350f'
   }
 };
 

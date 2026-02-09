@@ -61,6 +61,17 @@ const App: React.FC = () => {
   }, [selectedId, engine]);
 
   const handleStartGame = async (selectedFaction: Faction, resume: boolean = false) => {
+    // API Key Selection Check (required for this environment)
+    if (typeof window !== 'undefined' && (window as any).aistudio?.hasSelectedApiKey) {
+      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+      if (!hasKey) {
+        if ((window as any).aistudio.openSelectKey) {
+          await (window as any).aistudio.openSelectKey();
+          // GUIDELINE: Assume success after triggering openSelectKey() and proceed to avoid race condition.
+        }
+      }
+    }
+
     setFaction(selectedFaction);
     setLoading(true);
     
@@ -69,10 +80,17 @@ const App: React.FC = () => {
       engine.playerResources.wood = saveData.wood;
     }
 
-    const text = await generateBriefing(selectedFaction, resume ? (saveData?.mission || 1) : 1);
-    setBriefing(text);
-    setLoading(false);
-    setGameState('briefing');
+    try {
+      const text = await generateBriefing(selectedFaction, resume ? (saveData?.mission || 1) : 1);
+      setBriefing(text);
+      setGameState('briefing');
+    } catch (e) {
+      console.error("Failed to generate briefing:", e);
+      setBriefing("Commander, the war calls! To arms!");
+      setGameState('briefing');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOpenLeaderboard = async () => {
