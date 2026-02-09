@@ -23,12 +23,13 @@ const firebaseConfig = {
   appId: "1:303878706418:web:6b96377f9f360e117e6c6b"
 };
 
-// Check if an app is already initialized to avoid "Service unavailable" errors during hot reloads
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+// Singleton initialization pattern:
+// 1. Initialize app if no apps exist
+// 2. Export services tied directly to that app instance
+const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize and export services attached to the verified app instance
-export const db = getFirestore(app);
-export const auth = getAuth(app);
+export const db: Firestore = getFirestore(app);
+export const auth: Auth = getAuth(app);
 
 export interface PlayerData {
   uid: string;
