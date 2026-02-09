@@ -23,11 +23,22 @@ const firebaseConfig = {
   appId: "1:303878706418:web:6b96377f9f360e117e6c6b"
 };
 
-// Singleton initialization pattern:
-// 1. Initialize app if no apps exist
-// 2. Export services tied directly to that app instance
-const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+/**
+ * Robust Singleton initialization for Firebase.
+ * This pattern prevents 'Service unavailable' errors by ensuring the App 
+ * is initialized exactly once and that all services reference that same instance.
+ */
+function getOrInitializeApp(): FirebaseApp {
+  const existingApps = getApps();
+  if (existingApps.length > 0) {
+    return existingApps[0];
+  }
+  return initializeApp(firebaseConfig);
+}
 
+const app = getOrInitializeApp();
+
+// Explicitly initialize services using the confirmed app instance
 export const db: Firestore = getFirestore(app);
 export const auth: Auth = getAuth(app);
 
